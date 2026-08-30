@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>NEON SKY SHOOTER · 霓虹空战</title>
+  <!-- Google Fonts for Cyberpunk Aesthetic (with system-ui offline fallbacks) -->
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800;900&family=Rajdhani:wght@500;600;700&family=Share+Tech+Mono&display=swap">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- Main Game Container -->
+  <div id="game-container">
+    <!-- Canvas for 60fps High DPI Game Loop -->
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- Visual CRT Scanline & Damage Flash Overlays -->
+    <div class="scanline-overlay"></div>
+    <div id="damage-flash-overlay" class="damage-flash"></div>
+
+    <!-- IN-GAME HUD -->
+    <div id="game-hud">
+      <!-- Top Status Bar -->
+      <div class="hud-top-bar">
+        <div class="hud-box score-box">
+          <div class="hud-label">SCORE</div>
+          <div id="hud-score" class="hud-value neon-cyan">0</div>
+        </div>
+
+        <div class="hud-box stage-box">
+          <div id="hud-stage-name" class="hud-stage-title">STAGE 1 · ASTEROID OUTPOST</div>
+          <div id="hud-wave-count" class="hud-wave-subtitle">WAVE 1 / 4</div>
+        </div>
+
+        <div class="hud-box hiscore-box">
+          <div class="hud-label">HIGH SCORE</div>
+          <div id="hud-highscore" class="hud-value neon-gold">0</div>
+        </div>
+      </div>
+
+      <!-- Combo Gauge (Floating under top bar) -->
+      <div id="hud-combo-container" class="hud-combo-wrapper opacity-0">
+        <div class="combo-info">
+          <span class="combo-label">COMBO</span>
+          <span id="hud-combo-badge" class="combo-multiplier">x1</span>
+        </div>
+        <div class="combo-progress-bg">
+          <div id="hud-combo-bar" class="combo-progress-fill"></div>
+        </div>
+      </div>
+
+      <!-- Boss Encounter HUD (Visible only during Boss battles) -->
+      <div id="hud-boss-container" class="hud-boss-panel hidden">
+        <div class="boss-title-row">
+          <span class="boss-warning-tag">⚠️ BOSS ENCOUNTER</span>
+          <span id="hud-boss-name" class="boss-name-text">VOID VANGUARD</span>
+          <span id="hud-boss-hp-text" class="boss-hp-numbers">2500 / 2500</span>
+        </div>
+        <div class="boss-hp-track">
+          <div id="hud-boss-hp-bar" class="boss-hp-bar"></div>
+        </div>
+      </div>
+
+      <!-- Bottom Player Status Bar -->
+      <div class="hud-bottom-bar">
+        <!-- HP & Shield Gauge -->
+        <div class="player-bars-container">
+          <!-- Shield Bar -->
+          <div class="meter-group">
+            <div class="meter-header">
+              <span class="meter-title text-shield">🛡️ SHIELD</span>
+              <span id="hud-shield-text" class="meter-val text-shield">100 / 100</span>
+            </div>
+            <div class="meter-track">
+              <div id="hud-shield-bar" class="meter-fill fill-shield" style="width: 100%;"></div>
+            </div>
+          </div>
+
+          <!-- HP Bar -->
+          <div class="meter-group">
+            <div class="meter-header">
+              <span class="meter-title text-hp">❤️ HULL HP</span>
+              <span id="hud-hp-text" class="meter-val text-hp">100 / 100</span>
+            </div>
+            <div class="meter-track">
+              <div id="hud-hp-bar" class="meter-fill fill-hp" style="width: 100%;"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Weapon & Bomb Arsenal -->
+        <div class="arsenal-status">
+          <div class="weapon-info-box">
+            <span class="hud-tiny-label">WEAPON SYSTEM</span>
+            <span id="hud-weapon-badge" class="weapon-name-badge">LVL 1 PLASMA</span>
+          </div>
+
+          <div class="bomb-counter-box">
+            <span class="hud-tiny-label">EMP BOMBS</span>
+            <div id="hud-bomb-icons" class="bomb-icons-row">
+              <span class="bomb-icon-glow">💣</span>
+              <span class="bomb-icon-glow">💣</span>
+              <span class="bomb-icon-glow">💣</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Wave / Boss Announcement Banner -->
+      <div id="wave-announcement" class="announcement-banner hidden">
+        <div class="announcement-title">STAGE 1</div>
+        <div class="announcement-sub">ASTEROID OUTPOST</div>
+      </div>
+
+      <!-- Top-Right Audio Mute Quick Toggle -->
+      <button id="btn-audio-toggle" class="hud-icon-btn audio-btn" title="Toggle Sound (M)">
+        <span class="audio-icon">🔊</span>
+      </button>
+
+      <!-- Mobile Touch Controls Overlay -->
+      <div id="touch-controls-overlay" class="touch-controls">
+        <button id="btn-touch-pause" class="touch-action-btn pause-btn" title="Pause Game">
+          ⏸️
+        </button>
+        <button id="btn-touch-bomb" class="touch-action-btn bomb-btn" title="Detonate EMP Bomb">
+          💣 <span class="touch-btn-label">EMP BOMB</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- UI MODALS & MENUS -->
+
+    <!-- 1. START MENU MODAL -->
+    <div id="start-menu" class="game-modal menu-screen">
+      <div class="menu-content glass-card">
+        <div class="cyber-badge">CYBERPUNK SCI-FI SHOOTER</div>
+        <h1 class="game-title">
+          <span class="title-neon-cyan">NEON SKY</span>
+          <span class="title-neon-pink">SHOOTER</span>
+        </h1>
+        <div class="game-subtitle">霓 虹 空 战 · 深 空 霸 主</div>
+
+        <div class="menu-actions">
+          <button id="btn-start-campaign" class="cyber-btn btn-primary">
+            <span class="btn-glow"></span>
+            <span class="btn-text">🚀 战役模式 · CAMPAIGN</span>
+          </button>
+          <button id="btn-start-endless" class="cyber-btn btn-secondary">
+            <span class="btn-glow"></span>
+            <span class="btn-text">⚡ 无尽深空 · ENDLESS</span>
+          </button>
+          <button id="btn-how-to-play" class="cyber-btn btn-outline">
+            <span class="btn-text">🎮 操作指南 · HOW TO PLAY</span>
+          </button>
+          <button id="btn-toggle-gpu-quality" class="cyber-btn btn-outline quality-btn">
+            <span id="btn-quality-label" class="btn-text">⚡ 渲染画质: 极致独显 (ULTRA)</span>
+          </button>
+        </div>
+
+        <div class="menu-stats-card">
+          <div class="stats-item">
+            <span class="stats-label">HIGHEST RECORD</span>
+            <span id="menu-highscore" class="stats-number neon-gold">0</span>
+          </div>
+        </div>
+
+        <!-- GPU Hardware Detector Badge (Clickable for Setup Guide) -->
+        <div id="gpu-info-badge" class="gpu-hardware-badge" title="点击查看显卡硬件详情与 Windows 独显强制开启指南">
+          <span class="gpu-icon">🎮</span>
+          <span id="gpu-name-text" class="gpu-name">DETECTING ACCELERATOR...</span>
+          <span class="gpu-setup-hint">⚙️ 设置指南</span>
+        </div>
+
+        <div class="game-version-tag">SYSTEM v2.5.0 · 60FPS ARCADE ENGINE</div>
+      </div>
+    </div>
+
+    <!-- GPU SETUP & ACCELERATION MODAL -->
+    <div id="modal-gpu-setup" class="game-modal sub-modal hidden">
+      <div class="sub-modal-content glass-card gpu-modal-card">
+        <div class="modal-header">
+          <h2 class="neon-cyan">⚡ 显卡硬件与独显加速控制台</h2>
+          <button id="btn-close-gpu-setup" class="close-btn">✕</button>
+        </div>
+
+        <!-- Live Hardware Inspector -->
+        <div class="gpu-inspector-box">
+          <div class="inspector-item">
+            <span class="inspector-label">🖥️ 当前工作显卡:</span>
+            <span id="inspector-gpu-name" class="inspector-val neon-cyan">NVIDIA GeForce RTX / Intel</span>
+          </div>
+          <div class="inspector-item">
+            <span class="inspector-label">⚙️ 硬件加速级别:</span>
+            <span id="inspector-gpu-type" class="inspector-val neon-green">独立显卡加速 (Discrete GPU)</span>
+          </div>
+          <div class="inspector-item">
+            <span class="inspector-label">🚀 渲染 API 状态:</span>
+            <span id="inspector-gpu-api" class="inspector-val neon-gold">WebGL 2.0 + WebGPU Direct3D12</span>
+          </div>
+        </div>
+
+        <!-- Windows Dedicated GPU Guide -->
+        <div class="gpu-guide-container">
+          <div class="guide-section-title">💡 笔记本/双显卡用户：如何一键为浏览器强制开启独显？</div>
+          <div class="gpu-steps-list">
+            <div class="step-item">
+              <span class="step-badge">步骤 1</span>
+              <span class="step-desc">按键盘快捷键 <code>Win + S</code> 搜索并打开 <strong>【图形设置】(Graphics Settings)</strong>。</span>
+            </div>
+            <div class="step-item">
+              <span class="step-badge">步骤 2</span>
+              <span class="step-desc">在应用列表中选择你的浏览器（<strong>Google Chrome</strong> / <strong>Microsoft Edge</strong>），点击<strong>【选项】</strong>。</span>
+            </div>
+            <div class="step-item">
+              <span class="step-badge">步骤 3</span>
+              <span class="step-desc">将首选项由“让 Windows 决定”改为 <strong>【高性能 (如 NVIDIA / AMD 独立显卡)】</strong> 并保存。</span>
+            </div>
+            <div class="step-item">
+              <span class="step-badge">步骤 4</span>
+              <span class="step-desc"><strong>重启浏览器</strong>重新打开游戏，即可完美释放独立显卡满血性能，核显彻底 0 负载！</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-buttons-row">
+          <button id="btn-refresh-gpu" class="cyber-btn btn-secondary btn-sm">
+            <span class="btn-text">🔄 重新探测显卡状态</span>
+          </button>
+          <button id="btn-close-gpu-bottom" class="cyber-btn btn-primary btn-sm">
+            <span class="btn-text">返回游戏</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. HOW TO PLAY MODAL -->
+    <div id="modal-how-to-play" class="game-modal sub-modal hidden">
+      <div class="sub-modal-content glass-card">
+        <div class="modal-header">
+          <h2 class="neon-cyan">PILOT FLIGHT MANUAL</h2>
+          <button id="btn-close-how-to-play" class="close-btn">✕</button>
+        </div>
+        <div class="guide-grid">
+          <div class="guide-card">
+            <div class="guide-icon">🕹️</div>
+            <div class="guide-title">战机操控 (Controls)</div>
+            <div class="guide-text">
+              • <strong>鼠标/触控</strong>: 滑动精准控制战机移动，全自动开火<br>
+              • <strong>键盘</strong>: WASD 或 方向键移动<br>
+              • <strong>EMP 炸弹</strong>: 空格键 (Space) 或 右键释放<br>
+              • <strong>暂停 / 静音</strong>: P / Esc 暂停，M 切换音效
+            </div>
+          </div>
+          <div class="guide-card">
+            <div class="guide-icon">⚡</div>
+            <div class="guide-title">战术装备 (Power-ups)</div>
+            <div class="guide-text">
+              • <strong>⚡ 武器升级</strong>: 强化主炮散射、高能激光、等离子重炮<br>
+              • <strong>🛡️ 能量护盾</strong>: 优先吸收敌方伤害并自动护体<br>
+              • <strong>🛰️ 僚机部署</strong>: 部署浮游炮拦截子弹并协同攻击<br>
+              • <strong>🔥 过载爆发</strong>: 激活全弹暴风射速与穿透
+            </div>
+          </div>
+        </div>
+        <button id="btn-close-how-to-play-bottom" class="cyber-btn btn-primary btn-sm" onclick="document.getElementById('modal-how-to-play').classList.add('hidden')">
+          <span class="btn-text">明白，准备出击！</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- 3. PAUSE MENU MODAL -->
+    <div id="pause-menu" class="game-modal sub-modal hidden">
+      <div class="sub-modal-content glass-card pause-card">
+        <h2 class="neon-cyan glow-text">GAME PAUSED · 游戏暂停</h2>
+        <div class="pause-actions">
+          <button id="btn-resume" class="cyber-btn btn-primary">
+            <span class="btn-text">▶ 继续战斗 · RESUME</span>
+          </button>
+          <button id="btn-restart-pause" class="cyber-btn btn-secondary">
+            <span class="btn-text">🔄 重新开始 · RESTART</span>
+          </button>
+          <button id="btn-audio-pause-toggle" class="cyber-btn btn-outline">
+            <span class="btn-text">🔊 音效开关 · SOUND TOGGLE</span>
+          </button>
+          <button id="btn-main-menu-pause" class="cyber-btn btn-danger">
+            <span class="btn-text">🏠 返回主菜单 · MAIN MENU</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4. GAME OVER MODAL -->
+    <div id="gameover-menu" class="game-modal sub-modal hidden">
+      <div class="sub-modal-content glass-card gameover-card">
+        <div class="gameover-skull">💀</div>
+        <h2 class="neon-pink glow-text">MISSION FAILED · 战机坠毁</h2>
+        <div id="go-new-record-badge" class="new-record-badge hidden">🏆 NEW RECORD BREAK!</div>
+
+        <div class="summary-stats-box">
+          <div class="summary-row">
+            <span class="row-label">FINAL SCORE</span>
+            <span id="go-final-score" class="row-val neon-cyan">0</span>
+          </div>
+          <div class="summary-row">
+            <span class="row-label">HIGH SCORE</span>
+            <span id="go-high-score" class="row-val neon-gold">0</span>
+          </div>
+          <div class="summary-row">
+            <span class="row-label">ENEMIES DESTROYED</span>
+            <span id="go-kills" class="row-val">0</span>
+          </div>
+          <div class="summary-row">
+            <span class="row-label">MAX COMBO</span>
+            <span id="go-max-combo" class="row-val neon-pink">x0</span>
+          </div>
+        </div>
+
+        <div class="modal-buttons-row">
+          <button id="btn-restart-gameover" class="cyber-btn btn-primary">
+            <span class="btn-text">🔄 再次出击 · RETRY</span>
+          </button>
+          <button id="btn-main-menu-gameover" class="cyber-btn btn-outline">
+            <span class="btn-text">🏠 返回主菜单 · MENU</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 5. STAGE CLEAR MODAL -->
+    <div id="stage-clear-menu" class="game-modal sub-modal hidden">
+      <div class="sub-modal-content glass-card stage-clear-card">
+        <div class="victory-icon">🎖️</div>
+        <h2 id="stage-clear-title" class="neon-cyan glow-text">STAGE CLEARED!</h2>
+        <div class="stage-sub-status">SECTOR SECURED · 区域肃清完成</div>
+
+        <div class="summary-stats-box">
+          <div class="summary-row">
+            <span class="row-label">TOTAL SCORE</span>
+            <span id="stage-clear-score" class="row-val neon-cyan">0</span>
+          </div>
+          <div class="summary-row">
+            <span class="row-label">WARP HYPERSPACE</span>
+            <span class="row-val neon-green">READY 100%</span>
+          </div>
+        </div>
+
+        <button id="btn-next-stage" class="cyber-btn btn-primary btn-lg">
+          <span class="btn-text">🚀 跃迁至下一关卡 · NEXT STAGE</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- 6. CAMPAIGN VICTORY MODAL -->
+    <div id="victory-menu" class="game-modal sub-modal hidden">
+      <div class="sub-modal-content glass-card victory-card">
+        <div class="victory-icon">👑</div>
+        <h1 class="neon-gold glow-text">CAMPAIGN VICTORY!</h1>
+        <div class="stage-sub-status">母舰核心彻底瓦解 · 银河重归宁静</div>
+
+        <div class="summary-stats-box">
+          <div class="summary-row">
+            <span class="row-label">FINAL SCORE</span>
+            <span id="victory-score" class="row-val neon-gold">0</span>
+          </div>
+          <div class="summary-row">
+            <span class="row-label">ACHIEVEMENT</span>
+            <span class="row-val neon-cyan">STARFLEET ACE PILOT</span>
+          </div>
+        </div>
+
+        <div class="modal-buttons-row">
+          <button class="cyber-btn btn-secondary" onclick="window.game.startNewGame('ENDLESS')">
+            <span class="btn-text">⚡ 挑战无尽深空 · ENDLESS</span>
+          </button>
+          <button id="btn-main-menu-victory" class="cyber-btn btn-outline">
+            <span class="btn-text">🏠 返回主菜单 · MENU</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- GAME SCRIPTS IN STRICT DEPENDENCY ORDER -->
+  <script src="src/gpu.js"></script>
+  <script src="src/audio.js"></script>
+  <script src="src/starfield.js"></script>
+  <script src="src/bullets.js"></script>
+  <script src="src/player.js"></script>
+  <script src="src/items.js"></script>
+  <script src="src/enemies.js"></script>
+  <script src="src/levels.js"></script>
+  <script src="src/game.js"></script>
+</body>
+</html>
